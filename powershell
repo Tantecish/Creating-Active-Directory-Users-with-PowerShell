@@ -1,0 +1,76 @@
+# PREPARE THE CSV FILE (First, we need to make sure that we have a list of all the thousand users we need to create)
+# most important is the First name, Last name, username, address, department, phone number, Job title
+# Generate passwords by "Manytools Password Generator"
+# Create an OU in AD with the name of IT
+# Right click on the OU with the name of IT - click properties - attribute editor - Find the attribute distinguishedName - Double-click on it and copy the value
+# value in my example is OU=IT,OU=Users,OU=Company,DC=exoip,DC=local
+# Place the value in the fields under the column OU
+# Save it as type CSV UTF-8 (Comma delimited) (*.csv). Click the button Save.
+# NewUsersFinal.csv is created.
+# Run PowerShell as administrator. Use the Import-Csv cmdlet to read the CSV file.
+# If it can’t read the CSV file, remove the -Delimiter parameter. It will be Import-Csv “C:\Temp\NewUsersFinal.csv” | Format-Table.
+
+
+
+# Import active directory module
+Import-Module ActiveDirectory
+
+# path to the CSV file
+$csvPath = "C:\path\to\users.csv"
+
+# Import the CSV
+$users = Import-Csv -Path $csvPath
+
+foreach ($User in $ADUsers) {
+        # Define the parameters using a hashtable
+        $UserParams = @{
+            SamAccountName        = $User.username
+            UserPrincipalName     = "$($User.username)@$UPN"
+            Name                  = "$($User.firstname) $($User.lastname)"
+            GivenName             = $User.firstname
+            Surname               = $User.lastname
+            Initial               = $User.initials
+            Enabled               = $True
+            DisplayName           = "$($User.firstname) $($User.lastname)"
+            Path                  = $User.ou #This field refers to the OU the user account is to be created in
+            City                  = $User.city
+            PostalCode            = $User.zipcode
+            Country               = $User.country
+            Company               = $User.company
+            State                 = $User.state
+            StreetAddress         = $User.streetaddress
+            OfficePhone           = $User.telephone
+            EmailAddress          = $User.email
+            Title                 = $User.jobtitle
+            Department            = $User.department
+            AccountPassword       = (ConvertTo-secureString $User.password -AsPlainText -Force)
+            ChangePasswordAtLogon = $True
+        }
+
+        # Check to see if the user already exists in AD
+        if (Get-ADUser -Filter "SamAccountName -eq '$($User.username)'") {
+
+            # Give a warning if user exists
+            Write-Host "A user with username $($User.username) already exists in Active Directory." -ForegroundColor Yellow
+        }
+        else {
+            # User does not exist then proceed to create the new user account
+            # Account will be created in the OU provided by the $User.ou variable read from the CSV file
+            New-ADUser @UserParams
+
+            # If user is created, show message.
+            Write-Host "The user $($User.username) is created." -ForegroundColor Green
+        }
+    }
+    catch {
+        # Handle any errors that occur during account creation
+        Write-Host "Failed to create user $($User.username) - $_" -ForegroundColor Red
+    }
+}
+
+
+# You learned how to create Active Directory Users from CSV with PowerShell
+# First, prepare the CSV file and make sure all the information is filled in
+# When you have the final CSV file, import the CSV file in PowerShell to check if it’s readable
+# Adjust the two lines in the Add-NewUsers.ps1 script, as shown in the article. Run the script to create the users in AD
+# The last part is to check if the users are created successfully in ADUC.
